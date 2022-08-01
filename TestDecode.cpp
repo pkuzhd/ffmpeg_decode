@@ -43,15 +43,14 @@ using std::endl;
 using namespace std;
 
 int main() {
-    char video_url[] = "/home/zhd/010.2.mp4";
     int width = 1920;
     int height = 1080;
     Video2frame video[5] = {
-            {"/data/GoPro/videos/teaRoom/sequence/video/1.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"/data/GoPro/videos/teaRoom/sequence/video/2.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"/data/GoPro/videos/teaRoom/sequence/video/3.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"/data/GoPro/videos/teaRoom/sequence/video/4.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"/data/GoPro/videos/teaRoom/sequence/video/5.mp4", width, height, AV_PIX_FMT_BGR24}
+            {"../data/1.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"../data/2.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"../data/3.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"../data/4.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"../data/5.mp4", width, height, AV_PIX_FMT_BGR24}
 
     };
     Frame *frame[5] = {NULL, NULL, NULL, NULL, NULL};
@@ -91,7 +90,7 @@ int main() {
     int remain;
 
     ImageSender sender;
-    sender.open("/home/zhd/CLionProjects/pipe_transmission/pipe_dir/pipe1");
+    sender.open("../pipe_transmission/pipe_dir/pipe1");
 //    int fd = open("/dev/null", O_WRONLY);
 //    fcntl(fd, F_SETPIPE_SZ, 1048576);
     while (true) {
