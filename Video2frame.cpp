@@ -32,6 +32,12 @@ void demux_decode_thread(Video2frame *arg) {
             pkt_buffer.push(pkt);
             arg->m.unlock();
 
+            while (size >= 50) {
+                arg->m.lock();
+                size = buffer.size();
+                arg->m.unlock();
+            }
+
             if (size < 50) {
                 arg->m.lock();
                 pkt = pkt_buffer.front();
@@ -106,6 +112,7 @@ void demux_decode_thread(Video2frame *arg) {
         term = arg->term;
         arg->m.unlock();
     }
+    std::cout << "end" << std::endl;
     arg->m.lock();
     arg->is_finish = true;
     arg->m.unlock();
@@ -195,7 +202,7 @@ float Video2frame::getPTS() {
 int Video2frame::getBufferSize() {
     m.lock();
     int size = buffer.size();
-    if (is_finish)
+    if (is_finish && size == 0)
         size = -1;
     m.unlock();
     return size;

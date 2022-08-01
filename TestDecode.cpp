@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <cstdlib>
+#include <chrono>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc/types_c.h>
@@ -32,23 +33,25 @@ extern "C" {
 #endif
 
 #include "Video2frame.h"
+#include "utils/ImageSender.h"
 
-#define F_LINUX_SPECIFIC_BASE 1024
-#define F_SETPIPE_SZ (F_LINUX_SPECIFIC_BASE + 7)
-#define F_GETPIPE_SZ (F_LINUX_SPECIFIC_BASE + 8)
+//#define F_LINUX_SPECIFIC_BASE 1024
+//#define F_SETPIPE_SZ (F_LINUX_SPECIFIC_BASE + 7)
+//#define F_GETPIPE_SZ (F_LINUX_SPECIFIC_BASE + 8)
 using std::cout;
 using std::endl;
+using namespace std;
 
 int main() {
     char video_url[] = "/home/zhd/010.2.mp4";
     int width = 1920;
     int height = 1080;
     Video2frame video[5] = {
-            {"http://172.31.203.194:8765/hls/1.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/2.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/3.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/4.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/5.m3u8", width, height, AV_PIX_FMT_BGR24}
+            {"/data/GoPro/videos/teaRoom/sequence/video/1.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"/data/GoPro/videos/teaRoom/sequence/video/2.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"/data/GoPro/videos/teaRoom/sequence/video/3.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"/data/GoPro/videos/teaRoom/sequence/video/4.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"/data/GoPro/videos/teaRoom/sequence/video/5.mp4", width, height, AV_PIX_FMT_BGR24}
 
     };
     Frame *frame[5] = {NULL, NULL, NULL, NULL, NULL};
@@ -69,6 +72,7 @@ int main() {
         flag = true;
         for (int i = 0; i < 5; ++i) {
             if (pts - frame[i]->pts > 0.01) {
+                cout << "delete" << endl;
                 delete frame[i];
                 while ((frame[i] = video[i].getFrame()) == NULL);
                 pts = std::max(pts, frame[i]->pts);
@@ -82,47 +86,69 @@ int main() {
 
     int cnt = 0;
     flag = true;
-    time_t begin = time(NULL);
-    time_t end;
+    auto start_all = chrono::high_resolution_clock::now();
     float pts_begin = frame[0]->pts;
     int remain;
 
-//    int fd = open("/home/pku/pipe_test/using_pipe", O_WRONLY);
-//    int fd = open("/home/zhd/pipe", O_WRONLY);
-    int fd = open("/dev/null", O_WRONLY);
-    fcntl(fd, F_SETPIPE_SZ, 1048576);
+    ImageSender sender;
+    sender.open("/home/zhd/CLionProjects/pipe_transmission/pipe_dir/pipe1");
+//    int fd = open("/dev/null", O_WRONLY);
+//    fcntl(fd, F_SETPIPE_SZ, 1048576);
     while (true) {
         if (cnt % 50 == 0) {
-            end = time(NULL);
-            cout << end - begin << " " << frame[0]->pts - pts_begin << " "
-                 << (frame[0]->pts - pts_begin) / (end - begin) << endl;
+            auto end_all = chrono::high_resolution_clock::now();
+
+            cout << chrono::duration<double, milli>(end_all - start_all).count() / 1000 << " "
+                 << frame[0]->pts - pts_begin << " "
+                 << (frame[0]->pts - pts_begin) / chrono::duration<double, milli>(end_all - start_all).count() * 1000
+                 << endl;
             for (int i = 0; i < 5; ++i) {
                 printf("\t%d %.3f %3d %3d\n",
                        i, frame[i]->pts, video[i].getBufferSize(), video[i].getPacketBufferSize());
             }
         }
-        remain = sizeof(float);
-        while (remain > 0) {
-            int r = write(fd, (char *) (&frame[0]->pts) + (sizeof(float) - remain), remain);
-            if (r < 0) {
-                return 0;
-            }
-            remain -= r;
-        }
 
+        ImageData *data = new ImageData;
+
+        data->n = 5;
+        data->w = new int[data->n];
+        data->h = new int[data->n];
         for (int i = 0; i < 5; ++i) {
-            remain = frame[i]->size;
-
-            while (remain > 0) {
-                int r = write(fd, frame[i]->data + (frame[i]->size - remain), remain);
-                if (r < 0) {
-                    return 0;
-                }
-                remain -= r;
-            }
-            delete frame[i];
-
+            data->h[i] = height;
+            data->w[i] = width;
         }
+        data->imgs = new char[data->n * data->w[0] * data->h[0] * 3];
+        for (int i = 0; i < 5; ++i) {
+            memcpy(data->imgs + i * height * width * 3, frame[i]->data, height * width * 3);
+            delete frame[i];
+        }
+        sender.sendData(data);
+        delete[] data->imgs;
+        delete[] data->w;
+        delete[] data->h;
+        delete data;
+//        remain = sizeof(float);
+//        while (remain > 0) {
+//            int r = write(fd, (char *) (&frame[0]->pts) + (sizeof(float) - remain), remain);
+//            if (r < 0) {
+//                return 0;
+//            }
+//            remain -= r;
+//        }
+//
+//        for (int i = 0; i < 5; ++i) {
+//            remain = frame[i]->size;
+//
+//            while (remain > 0) {
+//                int r = write(fd, frame[i]->data + (frame[i]->size - remain), remain);
+//                if (r < 0) {
+//                    return 0;
+//                }
+//                remain -= r;
+//            }
+//            delete frame[i];
+//
+//        }
         pts = 0;
         for (int i = 0; i < 5; ++i) {
             while ((frame[i] = video[i].getFrame()) == NULL);

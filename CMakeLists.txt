@@ -8,6 +8,10 @@ include_directories(/home/zhd/.local/include)
 link_directories(/home/zhd/.local/lib)
 
 
+
+include_directories(../pipe_transmission)
+add_subdirectory(../pipe_transmission pipe_transmission)
+
 find_library(opencv 3)
 set(OPENCV_COMPONENTS
         opencv_core
@@ -43,6 +47,10 @@ add_executable(my_transcoding
         my_transcoding.c
         )
 
+add_executable(test
+        test.cpp
+        )
+
 add_executable(push
         push.cpp
         Frame2video.cpp Frame2video.h
@@ -71,6 +79,8 @@ target_link_libraries(TestDecode
         swscale
         SDL2
         ${OPENCV_COMPONENTS}
+        TransLib
+        pthread
         )
 target_link_libraries(push
         avutil
