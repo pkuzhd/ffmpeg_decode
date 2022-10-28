@@ -46,41 +46,68 @@ int main() {
     int width = 1920;
     int height = 1080;
     Video2frame video[5] = {
-            {"../data/1.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"../data/2.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"../data/3.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"../data/4.mp4", width, height, AV_PIX_FMT_BGR24},
-            {"../data/5.mp4", width, height, AV_PIX_FMT_BGR24}
+            {"rtmp://172.31.204.119:1935/live/1", width, height, AV_PIX_FMT_BGR24},
+            {"rtmp://172.31.204.119:1935/live/2", width, height, AV_PIX_FMT_BGR24},
+            {"rtmp://172.31.204.119:1935/live/3", width, height, AV_PIX_FMT_BGR24},
+            {"rtmp://172.31.204.119:1935/live/4", width, height, AV_PIX_FMT_BGR24},
+            {"rtmp://172.31.204.119:1935/live/5", width, height, AV_PIX_FMT_BGR24}
 
     };
     Frame *frame[5] = {NULL, NULL, NULL, NULL, NULL};
+    int64_t offset[5] = {0, 40, 80, 0, 0};
 
     bool flag = false;
     float pts = 0;
+    int64_t raw_pts = 0;
 
     for (int i = 0; i < 5; ++i) {
         video[i].run();
     }
-
+    for (int i = 0; i < 5; ++i) {
+        cout << video[i].getBufferSize() << " ";
+    }
+    cout << endl;
     for (int i = 0; i < 5; ++i) {
         while ((frame[i] = video[i].getFrame()) == NULL);
         pts = std::max(pts, frame[i]->pts);
+        raw_pts = std::max(raw_pts, frame[i]->raw_pts + offset[i]);
     }
+    for (int i = 0; i < 5; ++i) {
+        cout << frame[i]->raw_pts << " ";
+    }
+    cout << endl;
+
+
+    for (int i = 0; i < 5; ++i) {
+        cout << video[i].getBufferSize() << " ";
+    }
+    cout << endl;
 
     while (!flag) {
         flag = true;
         for (int i = 0; i < 5; ++i) {
-            if (pts - frame[i]->pts > 0.01) {
-                cout << "delete" << endl;
+            if (raw_pts - frame[i]->raw_pts - offset[i] > 20) {
+                cout << "delete " << i + 1 << " " << pts << " " << frame[i]->pts << " " << pts - frame[i]->pts << " "
+                     << frame[i]->raw_pts << endl;
                 delete frame[i];
                 while ((frame[i] = video[i].getFrame()) == NULL);
                 pts = std::max(pts, frame[i]->pts);
+                raw_pts = std::max(raw_pts, frame[i]->raw_pts + offset[i]);
             }
 
-            if (pts - frame[i]->pts > 0.01) {
+            if (raw_pts - frame[i]->raw_pts - offset[i] > 20) {
                 flag = false;
             }
         }
+
+        for (int i = 0; i < 5; ++i) {
+            cout << frame[i]->raw_pts << " ";
+        }
+        cout << endl;
+        for (int i = 0; i < 5; ++i) {
+            cout << video[i].getBufferSize() << " ";
+        }
+        cout << endl;
     }
 
     int cnt = 0;
@@ -90,11 +117,11 @@ int main() {
     int remain;
 
     ImageSender sender;
-    sender.open("../pipe_transmission/pipe_dir/pipe1");
+    sender.open("/home/zhd/CLionProjects/pipe_transmission/pipe_dir/pipe1");
 //    int fd = open("/dev/null", O_WRONLY);
 //    fcntl(fd, F_SETPIPE_SZ, 1048576);
     while (true) {
-        if (cnt % 50 == 0) {
+        if (cnt % 25 == 0) {
             auto end_all = chrono::high_resolution_clock::now();
 
             cout << chrono::duration<double, milli>(end_all - start_all).count() / 1000 << " "
@@ -102,8 +129,8 @@ int main() {
                  << (frame[0]->pts - pts_begin) / chrono::duration<double, milli>(end_all - start_all).count() * 1000
                  << endl;
             for (int i = 0; i < 5; ++i) {
-                printf("\t%d %.3f %3d %3d\n",
-                       i, frame[i]->pts, video[i].getBufferSize(), video[i].getPacketBufferSize());
+                printf("\t%d %d %3d %3d\n",
+                       i, frame[i]->raw_pts + offset[i], video[i].getBufferSize(), video[i].getPacketBufferSize());
             }
         }
 
@@ -121,51 +148,34 @@ int main() {
             memcpy(data->imgs + i * height * width * 3, frame[i]->data, height * width * 3);
             delete frame[i];
         }
-        sender.sendData(data);
+        if ((raw_pts / 40) % 3 == 0)
+            sender.sendData(data);
         delete[] data->imgs;
         delete[] data->w;
         delete[] data->h;
         delete data;
-//        remain = sizeof(float);
-//        while (remain > 0) {
-//            int r = write(fd, (char *) (&frame[0]->pts) + (sizeof(float) - remain), remain);
-//            if (r < 0) {
-//                return 0;
-//            }
-//            remain -= r;
-//        }
-//
-//        for (int i = 0; i < 5; ++i) {
-//            remain = frame[i]->size;
-//
-//            while (remain > 0) {
-//                int r = write(fd, frame[i]->data + (frame[i]->size - remain), remain);
-//                if (r < 0) {
-//                    return 0;
-//                }
-//                remain -= r;
-//            }
-//            delete frame[i];
-//
-//        }
+
         pts = 0;
         for (int i = 0; i < 5; ++i) {
             while ((frame[i] = video[i].getFrame()) == NULL);
+            raw_pts = std::max(raw_pts, frame[i]->raw_pts + offset[i]);
             pts = std::max(pts, frame[i]->pts);
         }
         bool sync = true;
         for (int i = 0; i < 5; ++i) {
-            if (pts - frame[i]->pts > 0.01)
+            if (raw_pts - frame[i]->raw_pts - offset[i] > 20)
                 sync = false;
         }
         if (!sync) {
+            cout << "not sync" << endl;
             cout << pts << endl;
             for (int i = 0; i < 5; ++i) {
-                printf("%d %.3f\n", i, frame[i]->pts);
+                printf("%d %d\n", i, frame[i]->raw_pts);
             }
-            return 0;
+//            return 0;
         }
         ++cnt;
     }
+    cout << "return" << endl;
     return 0;
 }

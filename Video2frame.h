@@ -26,6 +26,7 @@ extern "C" {
 class Frame {
 public:
     float pts;
+    int64_t raw_pts;
     uint8_t *data = NULL;
     AVFrame *frame;
     size_t size;

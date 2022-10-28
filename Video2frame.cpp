@@ -23,7 +23,7 @@ void demux_decode_thread(Video2frame *arg) {
         pkt = av_packet_alloc();
         ret = av_read_frame(format_ctx, pkt);
         if (ret != 0)
-            break;
+            continue;
 
         if (pkt->stream_index == arg->video_stream_idx) {
             int size;
@@ -32,13 +32,13 @@ void demux_decode_thread(Video2frame *arg) {
             pkt_buffer.push(pkt);
             arg->m.unlock();
 
-            while (size >= 50) {
+            while (size >= 500) {
                 arg->m.lock();
                 size = buffer.size();
                 arg->m.unlock();
             }
 
-            if (size < 50) {
+            if (size < 500) {
                 arg->m.lock();
                 pkt = pkt_buffer.front();
                 pkt_buffer.pop();
@@ -83,7 +83,7 @@ void demux_decode_thread(Video2frame *arg) {
 
                     av_frame_copy(f, frame_out);
                     Frame *frame = new Frame(pts, f, frame_size);
-
+                    frame->raw_pts = frame_raw->pts;
 //                printf("%s frame %ld %.3f %ld\n", arg->url.c_str(), frame_raw->pts,
 //                       frame_raw->pts * 1.0 * av_q2d(format_ctx->streams[arg->video_stream_idx]->time_base),
 //                       frame_raw->pkt_duration);
