@@ -54,7 +54,7 @@ int main() {
 
     };
     Frame *frame[5] = {NULL, NULL, NULL, NULL, NULL};
-    int64_t offset[5] = {0, 40, 80, 0, 0};
+    int64_t offset[5] = {40, 160, 0, 40, 360};
 
     bool flag = false;
     float pts = 0;
@@ -148,7 +148,7 @@ int main() {
             memcpy(data->imgs + i * height * width * 3, frame[i]->data, height * width * 3);
             delete frame[i];
         }
-        if ((raw_pts / 40) % 3 == 0)
+        if ((raw_pts / 40) % 8 == 0)
             sender.sendData(data);
         delete[] data->imgs;
         delete[] data->w;

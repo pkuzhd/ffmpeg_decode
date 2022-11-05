@@ -79,9 +79,8 @@ void demux_decode_thread(Video2frame *arg) {
                     f->format = frame_out->format = arg->pix_fmt;
                     f->width = frame_out->width = arg->width;
                     f->height = frame_out->height = arg->height;
-                    av_frame_get_buffer(f, 1);
+                    av_frame_ref(f, frame_out);
 
-                    av_frame_copy(f, frame_out);
                     Frame *frame = new Frame(pts, f, frame_size);
                     frame->raw_pts = frame_raw->pts;
 //                printf("%s frame %ld %.3f %ld\n", arg->url.c_str(), frame_raw->pts,

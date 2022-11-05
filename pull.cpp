@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
+#include <cstdio>
 #include <cstdlib>
 
 #include <opencv2/opencv.hpp>
@@ -36,20 +37,16 @@ using std::cout;
 using std::endl;
 
 int main() {
+    const int num_stream = 1;
     char video_url[] = "/home/zhd/010.2.mp4";
     int width = 1920;
     int height = 1080;
     Video2frame video[5] = {
-//            {"rtmp://172.31.203.194:1935/live/1", width, height, AV_PIX_FMT_BGR24},
-//            {"rtmp://172.31.203.194:1935/live/2", width, height, AV_PIX_FMT_BGR24},
-//            {"rtmp://172.31.203.194:1935/live/3", width, height, AV_PIX_FMT_BGR24},
-//            {"rtmp://172.31.203.194:1935/live/4", width, height, AV_PIX_FMT_BGR24},
-//            {"rtmp://172.31.203.194:1935/live/5", width, height, AV_PIX_FMT_BGR24}
-            {"http://172.31.203.194:8765/hls/1.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/2.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/3.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/4.m3u8", width, height, AV_PIX_FMT_BGR24},
-            {"http://172.31.203.194:8765/hls/5.m3u8", width, height, AV_PIX_FMT_BGR24}
+            {"/home/zhd/webcam/5.mp4", width, height, AV_PIX_FMT_BGR24},
+            {"/home/zhd/webcam/5.ts",             width, height, AV_PIX_FMT_BGR24},
+            {"/home/zhd/webcam/5.ts",             width, height, AV_PIX_FMT_BGR24},
+            {"/home/zhd/webcam/5.ts",             width, height, AV_PIX_FMT_BGR24},
+            {"/home/zhd/webcam/5.ts",             width, height, AV_PIX_FMT_BGR24}
 
     };
     Frame *frame[5] = {NULL, NULL, NULL, NULL, NULL};
@@ -57,18 +54,30 @@ int main() {
     bool flag = false;
     float pts = 0;
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < num_stream; ++i) {
         video[i].run();
     }
 
-    for (int i = 0; i < 5; ++i) {
+    while (1) {
+        for (int i = 0; i < num_stream; ++i) {
+            while ((frame[i] = video[i].getFrame()) == nullptr);
+            if (frame[i]) {
+                printf("%d %ld %f\n", i, frame[i]->raw_pts, frame[i]->pts);
+            } else
+                cout << i << " null" << endl;
+        }
+    }
+
+    return 0;
+
+    for (int i = 0; i < num_stream; ++i) {
         while ((frame[i] = video[i].getFrame()) == NULL);
         pts = std::max(pts, frame[i]->pts);
     }
 
     while (!flag) {
         flag = true;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < num_stream; ++i) {
             if (pts - frame[i]->pts > 0.01) {
                 delete frame[i];
                 while ((frame[i] = video[i].getFrame()) == NULL);
@@ -97,7 +106,7 @@ int main() {
             end = time(NULL);
             cout << end - begin << " " << frame[0]->pts - pts_begin << " "
                  << (frame[0]->pts - pts_begin) / (end - begin) << endl;
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < num_stream; ++i) {
                 printf("\t%d %.3f %3d %3d\n",
                        i, frame[i]->pts, video[i].getBufferSize(), video[i].getPacketBufferSize());
             }
@@ -111,7 +120,7 @@ int main() {
             remain -= r;
         }
 
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < num_stream; ++i) {
             remain = frame[i]->size;
 
             while (remain > 0) {
@@ -125,18 +134,18 @@ int main() {
 
         }
         pts = 0;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < num_stream; ++i) {
             while ((frame[i] = video[i].getFrame()) == NULL);
             pts = std::max(pts, frame[i]->pts);
         }
         bool sync = true;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < num_stream; ++i) {
             if (pts - frame[i]->pts > 0.01)
                 sync = false;
         }
         if (!sync) {
             cout << pts << endl;
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < num_stream; ++i) {
                 printf("%d %.3f\n", i, frame[i]->pts);
             }
             return 0;

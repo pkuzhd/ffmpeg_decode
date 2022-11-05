@@ -65,7 +65,7 @@ int main() {
                          width,
                          height,
                          1);
-    char *out_filename = "/home/zhd/test.mp4";
+    const char *out_filename = "/home/zhd/test.mp4";
     AVFormatContext *out_ctx;
     avformat_alloc_output_context2(&out_ctx, NULL, NULL, out_filename);
 
@@ -76,7 +76,7 @@ int main() {
     av_dump_format(out_ctx, 0, out_filename, 1);
     avio_open(&out_ctx->pb, out_filename, AVIO_FLAG_WRITE);
 
-    avformat_write_header(out_ctx, NULL);
+    ret = avformat_write_header(out_ctx, NULL);
 
 
     for (int i = 0; i < 100; ++i) {
