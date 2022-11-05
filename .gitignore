@@ -3,3 +3,5 @@ cmake-build-debug/
 png/
 .idea/
 *.log
+.vscode/
+build/

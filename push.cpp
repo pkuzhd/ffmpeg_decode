@@ -4,6 +4,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstring>
+#include <cstdlib>
+#include <chrono>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,22 +28,27 @@ extern "C" {
 using std::cout;
 using std::endl;
 using namespace net_video;
+using namespace std;
 
 int main() {
     int ret;
     Status status;
     char video_url[] = "/home/zhd/010.2.mp4";
-    int width = 3840;
-    int height = 2160;
+    int width = 1920;
+    int height = 1080;
     AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P;
     Video2frame video =
-            {"http://172.31.203.194:8765/hls/1.m3u8", width, height, pix_fmt};
+            // {"/data/zhanghaodan/web/demo3/1.bg.mp4", width, height, pix_fmt};
+            {"rtmp://172.31.204.119:1935/live/1", width, height, pix_fmt};
     video.run();
 
-    const char *out_filename = "rtmp://172.31.203.194:1935/hls/1.2";
+    const char *out_filename = "rtmp://172.31.204.119:1935/live/push";
+    out_filename = "rtmp://127.0.0.1:1935/live/push";
+    out_filename = "/home/zhd/test.flv";
 
-    std::shared_ptr<Muxer> muxer = std::make_shared<Muxer>(out_filename, "flv");
-    std::shared_ptr<Encoder> encoder = std::make_shared<Encoder>("libx264");
+    shared_ptr<Frame2video> video_out = make_shared<Frame2video>(out_filename, "flv", "libx264");
+    std::shared_ptr<Muxer> muxer = video_out->muxer;
+    std::shared_ptr<Encoder> encoder = video_out->encoder;
 
     AVFormatContext *out_ctx = muxer->context;
     AVCodecContext *codec_ctx = encoder->context;
@@ -49,7 +57,7 @@ int main() {
     codec_ctx->width = width;
     codec_ctx->height = height;
     codec_ctx->time_base = (AVRational) {1, 1000};
-    codec_ctx->framerate = (AVRational) {50, 1};
+    codec_ctx->framerate = (AVRational) {25, 1};
     codec_ctx->gop_size = 25;
     codec_ctx->max_b_frames = 1;
     codec_ctx->pix_fmt = pix_fmt;
@@ -57,20 +65,7 @@ int main() {
     if (out_ctx->oformat->flags & AVFMT_GLOBALHEADER)
         codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-    status = encoder->open();
-    if (status != OK) {
-        av_log(encoder->context, AV_LOG_INFO, "open error\n");
-    }
-
-    status = muxer->addStream(encoder);
-    if (status != OK) {
-        av_log(muxer->context, AV_LOG_INFO, "addStream error\n");
-    }
-
-    status = muxer->open();
-    if (status != OK) {
-        av_log(muxer->context, AV_LOG_INFO, "open error\n");
-    }
+    video_out->open();
 
     av_dump_format(out_ctx, 0, out_filename, 1);
 
@@ -78,59 +73,43 @@ int main() {
     AVFrame *frame = av_frame_alloc();
     AVPacket *pkt = av_packet_alloc();
 
-    frame->format = AV_PIX_FMT_YUV420P;
-    frame->width = width;
-    frame->height = height;
-//    ret = av_frame_get_buffer(frame, 0);
-    uint8_t *buffer = (uint8_t *) av_malloc(width * height * 3 / 2);
-    av_image_fill_arrays(frame->data,
-                         frame->linesize,
-                         buffer,
-                         pix_fmt,
-                         width,
-                         height,
-                         1);
-//    char *out_filename = "/home/zhd/test.flv";
+    // frame->format = pix_fmt;
+    // frame->width = width;
+    // frame->height = height;
+    // uint8_t *buffer = (uint8_t *) av_malloc(width * height * 3 / 2);
+    // av_image_fill_arrays(frame->data,
+    //                      frame->linesize,
+    //                      buffer,
+    //                      pix_fmt,
+    //                      width,
+    //                      height,
+    //                      1);
 
+    auto start_all = chrono::high_resolution_clock::now();
+    int frame_cnt = 0;
 
-
-
-
-    for (int i = 0; i < 50 * 1000; ++i) {
+    for (int i = 0; i < 25 * 10; ++i) {
         Frame *f;
         while ((f = video.getFrame()) == NULL);
 
-        memcpy(frame->data[0], f->data, f->size);
+        av_frame_ref(frame, f->frame);
         frame->pts = f->pts * 1000;
 
-        ret = avcodec_send_frame(codec_ctx, frame);
-        while (true) {
-            av_packet_unref(pkt);
-            ret = avcodec_receive_packet(codec_ctx, pkt);
-            if (ret != 0)
-                break;
-
-            pkt->stream_index = 0;
-
-            av_packet_rescale_ts(pkt, codec_ctx->time_base, out_ctx->streams[0]->time_base);
-            ret = av_interleaved_write_frame(out_ctx, pkt);
-            if (ret < 0) {
-                av_log(NULL, AV_LOG_INFO, "av_interleaved_write_frame(), %d\n", ret);
-            }
-        }
+        video_out->writeFrame(frame);
+        
+        auto end_all = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration<double, milli>(end_all - start_all).count() / 1000;
+        printf("frame: %8d, fps: %4.0lf\n", video_out->frame_cnt, video_out->frame_cnt / duration);
+        
+        av_frame_unref(frame);
         delete f;
     }
-    avcodec_send_frame(codec_ctx, NULL);
-    while (true) {
-        ret = avcodec_receive_packet(codec_ctx, pkt);
-        if (ret != 0)
-            break;
-//        cout << -1 << " " << pkt->dts << " " << pkt->pts << " " << pkt->size << endl;
-        av_packet_rescale_ts(pkt, codec_ctx->time_base, out_ctx->streams[0]->time_base);
-        av_interleaved_write_frame(out_ctx, pkt);
-    }
+    video_out->writeFrame(nullptr);
+    video_out->close();
 
-    muxer->close();
+    auto end_all = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration<double, milli>(end_all - start_all).count() / 1000;
+    printf("frame: %8d, fps: %4.0lf\n", video_out->frame_cnt, video_out->frame_cnt / duration);
 
     return 0;
 }

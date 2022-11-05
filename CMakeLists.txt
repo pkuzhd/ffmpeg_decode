@@ -21,17 +21,30 @@ set(OPENCV_COMPONENTS
         opencv_objdetect
         opencv_video)
 
-add_executable(ffmpeg_test
-        main.cpp
+# add_executable(ffmpeg_test
+#         main.cpp
+#         Video2frame.cpp Video2frame.h
+#         )
+
+add_library(VideoLib
+        source/Muxer.cpp source/Muxer.h
+        source/Encoder.cpp source/Encoder.h
         Video2frame.cpp Video2frame.h
+        Frame2video.cpp Frame2video.h
         )
+target_link_libraries(
+        VideoLib
+        avutil
+        avformat
+        avcodec
+        swscale
+)
+
 add_executable(TestDecode
         TestDecode.cpp
-        Video2frame.cpp Video2frame.h
         )
 add_executable(pull
         pull.cpp
-        Video2frame.cpp Video2frame.h
         )
 
 add_executable(filtering_video
@@ -53,33 +66,27 @@ add_executable(test
 
 add_executable(push
         push.cpp
-        Frame2video.cpp Frame2video.h
-        Video2frame.cpp Video2frame.h
-        source/Muxer.cpp
-        source/Encoder.cpp
-        )
-add_executable(show_frame_info
-        show_frame_info.cpp
-        Frame2video.cpp Frame2video.h
-        Video2frame.cpp Video2frame.h
         )
 
-target_link_libraries(ffmpeg_test
-        avutil
-        avformat
-        avcodec
-        swscale
-        SDL2
-        ${OPENCV_COMPONENTS}
+add_executable(show_frame_info
+        show_frame_info.cpp
         )
+
+# target_link_libraries(ffmpeg_test
+#         avutil
+#         avformat
+#         avcodec
+#         swscale
+#         SDL2
+#         ${OPENCV_COMPONENTS}
+#         )
 target_link_libraries(TestDecode
         avutil
         avformat
         avcodec
         swscale
-        SDL2
-        ${OPENCV_COMPONENTS}
         TransLib
+        VideoLib
         pthread
         )
 target_link_libraries(push
@@ -87,8 +94,9 @@ target_link_libraries(push
         avformat
         avcodec
         swscale
-        SDL2
-        ${OPENCV_COMPONENTS}
+        TransLib
+        VideoLib
+        pthread
         )
 target_link_libraries(show_frame_info
         avutil
@@ -97,6 +105,7 @@ target_link_libraries(show_frame_info
         swscale
         SDL2
         ${OPENCV_COMPONENTS}
+        VideoLib
         )
 target_link_libraries(filtering_video
         avfilter
@@ -140,6 +149,35 @@ target_link_libraries(pull
         avformat
         avcodec
         swscale
-        SDL2
+        VideoLib
+        )
+
+add_executable(demux demux.cpp)
+target_link_libraries(demux
+        avutil
+        avformat
+        avcodec
+        swscale
         ${OPENCV_COMPONENTS}
+        )
+#add_executable(rtmp_push rtmp_push.cpp)
+#target_link_libraries(demux
+#        avutil
+#        avformat
+#        avcodec
+#        swscale
+#        )
+add_executable(decode decode_video.cpp)
+target_link_libraries(decode
+        avutil
+        avformat
+        avcodec
+        swscale
+        )
+add_executable(encode encode_video.cpp)
+target_link_libraries(encode
+        avutil
+        avformat
+        avcodec
+        swscale
         )
